@@ -17,6 +17,6 @@ function calculateOverallConfidence({
   return Number(overall.toFixed(2));
 }
 
-export default {
+module.exports = {
   calculateOverallConfidence
 };

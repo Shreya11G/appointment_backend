@@ -9,18 +9,22 @@ const { calculateOverallConfidence } = require("../utils/confidence");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+// GET route for browser testing
 router.get("/parse-appointment", (req, res) => {
   res.json({
     message: "POST this endpoint to parse appointments"
   });
 });
 
+// POST route for text / image
 router.post("/parse-appointment", upload.single("image"), async (req, res) => {
   try {
     console.log("FILE RECEIVED:", req.file);
     console.log("BODY:", req.body);
 
-    const { rawText } = await ocrService.extractText(req.body.text, req.file);
+    const { rawText, confidence: ocrConfidence } =
+      await ocrService.extractText(req.body.text, req.file);
 
     const entitiesResult = entityService.extractEntities(rawText);
 
@@ -47,6 +51,13 @@ router.post("/parse-appointment", upload.single("image"), async (req, res) => {
       });
     }
 
+    const overallConfidence = calculateOverallConfidence({
+      ocrConfidence,
+      entityConfidence: entitiesResult.entities_confidence,
+      normalizationConfidence: normalizedResult.normalization_confidence,
+      hasMissingFields: false
+    });
+
     res.json({
       appointment: {
         department: entitiesResult.entities.department_normalized,
@@ -54,15 +65,16 @@ router.post("/parse-appointment", upload.single("image"), async (req, res) => {
         time: normalizedResult.normalized.time,
         tz: "Asia/Kolkata"
       },
+      overall_confidence: overallConfidence,
       status: "ok"
     });
 
   } catch (err) {
-  console.error("🔥 INTERNAL ERROR:", err);
-  res.status(500).json({
-    error: err.message,
-    stack: err.stack
-  });
-}
+    console.error("🔥 INTERNAL ERROR:", err);
+    res.status(500).json({
+      error: err.message
+    });
+  }
 });
+
 module.exports = router;
